@@ -1,0 +1,33 @@
+apiVersion: foundry.microsoft.com/v1
+kind: AgentManifest
+metadata:
+  name: ingestion
+spec:
+  role: ingestion
+  runtime:
+    module: submission_evaluation.agents.ingestion
+    class: IngestionAgent
+  resources:
+    cpuMillicores: 500
+    memoryMiB: 512
+    tpm: 60000
+  healthCheck:
+    endpoint: /health/ingestion
+    type: command
+    command:
+      - python
+      - -m
+      - submission_evaluation.main
+      - --discover-agents
+    intervalSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 3
+  environment:
+    required:
+      - INPUT_DIR
+      - OUTPUT_DIR
+      - AZURE_OPENAI_ENDPOINT
+      - AZURE_OPENAI_DEPLOYMENT
+      - AZURE_OPENAI_API_VERSION
+    secrets:
+      - AZURE_OPENAI_API_KEY

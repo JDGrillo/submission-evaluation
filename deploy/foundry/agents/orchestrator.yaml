@@ -1,0 +1,35 @@
+apiVersion: foundry.microsoft.com/v1
+kind: AgentManifest
+metadata:
+  name: orchestrator
+spec:
+  role: orchestrator
+  runtime:
+    module: submission_evaluation.agents.orchestrator
+    class: OrchestratorAgent
+  resources:
+    cpuMillicores: 1000
+    memoryMiB: 1024
+    tpm: 120000
+  healthCheck:
+    endpoint: /health/orchestrator
+    type: command
+    command:
+      - python
+      - -m
+      - submission_evaluation.main
+      - --discover-agents
+    intervalSeconds: 20
+    timeoutSeconds: 10
+    failureThreshold: 3
+  environment:
+    required:
+      - INPUT_DIR
+      - OUTPUT_DIR
+      - AZURE_OPENAI_ENDPOINT
+      - AZURE_OPENAI_DEPLOYMENT
+      - AZURE_OPENAI_API_VERSION
+      - WEB_SEARCH_ENDPOINT
+    secrets:
+      - AZURE_OPENAI_API_KEY
+      - WEB_SEARCH_API_KEY

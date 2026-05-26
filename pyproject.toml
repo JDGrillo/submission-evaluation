@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "submission-evaluation"
+version = "0.1.0"
+description = "Foundry-oriented multi-agent skeleton for submission evaluation"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "openai>=1.30.0",
+  "azure-ai-projects>=1.0.0b6",
+  "httpx>=0.27.0",
+  "openpyxl>=3.1.0",
+  "pypdf>=4.2.0",
+  "reportlab>=4.2.0",
+  "PyYAML>=6.0.1"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+  "ruff>=0.5.0"
+]
+
+[project.scripts]
+submission-eval = "submission_evaluation.main:main"
+submission-eval-deploy = "submission_evaluation.deploy:main"
+submission-eval-smoke = "submission_evaluation.deploy_smoke:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

@@ -1,0 +1,35 @@
+apiVersion: foundry.microsoft.com/v1
+kind: AgentManifest
+metadata:
+  name: research
+spec:
+  role: research
+  runtime:
+    module: submission_evaluation.agents.research
+    class: ResearchAgent
+  resources:
+    cpuMillicores: 750
+    memoryMiB: 768
+    tpm: 80000
+  healthCheck:
+    endpoint: /health/research
+    type: command
+    command:
+      - python
+      - -m
+      - submission_evaluation.main
+      - --discover-agents
+    intervalSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 3
+  environment:
+    required:
+      - INPUT_DIR
+      - OUTPUT_DIR
+      - AZURE_OPENAI_ENDPOINT
+      - AZURE_OPENAI_DEPLOYMENT
+      - AZURE_OPENAI_API_VERSION
+      - WEB_SEARCH_ENDPOINT
+    secrets:
+      - AZURE_OPENAI_API_KEY
+      - WEB_SEARCH_API_KEY

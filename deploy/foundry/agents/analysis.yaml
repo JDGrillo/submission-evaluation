@@ -1,0 +1,33 @@
+apiVersion: foundry.microsoft.com/v1
+kind: AgentManifest
+metadata:
+  name: analysis
+spec:
+  role: analysis
+  runtime:
+    module: submission_evaluation.agents.analysis
+    class: AnalysisAgent
+  resources:
+    cpuMillicores: 750
+    memoryMiB: 768
+    tpm: 90000
+  healthCheck:
+    endpoint: /health/analysis
+    type: command
+    command:
+      - python
+      - -m
+      - submission_evaluation.main
+      - --discover-agents
+    intervalSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 3
+  environment:
+    required:
+      - INPUT_DIR
+      - OUTPUT_DIR
+      - AZURE_OPENAI_ENDPOINT
+      - AZURE_OPENAI_DEPLOYMENT
+      - AZURE_OPENAI_API_VERSION
+    secrets:
+      - AZURE_OPENAI_API_KEY

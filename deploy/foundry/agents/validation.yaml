@@ -1,0 +1,33 @@
+apiVersion: foundry.microsoft.com/v1
+kind: AgentManifest
+metadata:
+  name: validation
+spec:
+  role: validation
+  runtime:
+    module: submission_evaluation.agents.validation
+    class: ValidationAgent
+  resources:
+    cpuMillicores: 500
+    memoryMiB: 512
+    tpm: 50000
+  healthCheck:
+    endpoint: /health/validation
+    type: command
+    command:
+      - python
+      - -m
+      - submission_evaluation.main
+      - --discover-agents
+    intervalSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 3
+  environment:
+    required:
+      - INPUT_DIR
+      - OUTPUT_DIR
+      - AZURE_OPENAI_ENDPOINT
+      - AZURE_OPENAI_DEPLOYMENT
+      - AZURE_OPENAI_API_VERSION
+    secrets:
+      - AZURE_OPENAI_API_KEY

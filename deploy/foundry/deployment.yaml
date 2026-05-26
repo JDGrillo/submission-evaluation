@@ -1,0 +1,19 @@
+apiVersion: foundry.microsoft.com/v1
+kind: Deployment
+metadata:
+  name: submission-evaluation
+spec:
+  project:
+    name: submission-evaluation
+    environment: production
+  agentManifests:
+    - ./agents/analysis.yaml
+    - ./agents/ingestion.yaml
+    - ./agents/orchestrator.yaml
+    - ./agents/report.yaml
+    - ./agents/research.yaml
+    - ./agents/validation.yaml
+  envSchema: ./env.schema.json
+  deploymentCommand:
+    template: "foundry deploy apply --config {bundle}"
+    notes: "Provide command override via FOUNDRY_DEPLOY_COMMAND or --execute-command"
