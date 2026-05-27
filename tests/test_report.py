@@ -381,3 +381,49 @@ def test_report_when_pdf_render_fails_should_write_markdown_fallback(tmp_path: P
     assert result.payload["format"] == "markdown"
     assert Path(str(result.payload["report_path"])).exists()
     assert Path(str(result.payload["report_path"])).suffix == ".md"
+
+
+def test_report_when_compact_template_selected_should_apply_template_in_output(tmp_path: Path):
+    manifest = _manifest()
+    config = AppConfig.from_env()
+    config = AppConfig(
+        input_dir=config.input_dir,
+        processed_dir=config.processed_dir,
+        output_dir=tmp_path,
+        azure_openai_endpoint=config.azure_openai_endpoint,
+        azure_openai_api_key=config.azure_openai_api_key,
+        azure_openai_deployment=config.azure_openai_deployment,
+        azure_openai_api_version=config.azure_openai_api_version,
+        web_search_endpoint=config.web_search_endpoint,
+        web_search_api_key=config.web_search_api_key,
+    )
+
+    class FailingPdfReportAgent(ReportAgent):
+        def _render_pdf(self, *, pdf_path: Path, report_data: Mapping[str, Any]) -> None:
+            _ = (pdf_path, report_data)
+            raise RuntimeError("forced render failure")
+
+    payload = _payload(manifest)
+    payload["report_template"] = "compact"
+    agent = FailingPdfReportAgent(config=config)
+
+    result = agent.invoke(payload)
+
+    assert result.status == "ok"
+    assert result.payload["report_template"] == "compact"
+    markdown = Path(str(result.payload["report_path"])).read_text(encoding="utf-8")
+    assert "# Submission Risk Report (Compact)" in markdown
+    assert "- Key Factors:" not in markdown
+
+
+def test_report_when_unknown_template_should_fallback_to_standard(tmp_path: Path):
+    manifest = _manifest()
+    payload = _payload(manifest)
+    payload["report_template"] = "not-a-template"
+    payload["draft_only"] = True
+    agent = _build_agent(tmp_path)
+
+    result = agent.invoke(payload)
+
+    assert result.status == "ok"
+    assert result.payload["report_template"] == "standard"

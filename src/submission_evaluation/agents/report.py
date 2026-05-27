@@ -67,6 +67,20 @@ def _risk_color_cell(color_name: str):
     return mapping.get(color_name, colors.HexColor("#D6DBDF") if _REPORTLAB_AVAILABLE else None)
 
 
+_REPORT_TEMPLATES: dict[str, dict[str, Any]] = {
+    "standard": {
+        "title": "Submission Risk Report",
+        "include_category_table": True,
+        "include_key_factors": True,
+    },
+    "compact": {
+        "title": "Submission Risk Report (Compact)",
+        "include_category_table": False,
+        "include_key_factors": False,
+    },
+}
+
+
 class ReportAgent(NoOpAgent):
     def __init__(self, *, config: AppConfig | None = None) -> None:
         super().__init__("report")
@@ -77,6 +91,7 @@ class ReportAgent(NoOpAgent):
         if manifest is None:
             return super().invoke(payload)
         draft_only = bool(payload.get("draft_only", False))
+        report_template = self._extract_template(payload)
 
         manifest_location_ids = [location.id for location in manifest.locations if location.id]
         report_locations = self._build_report_locations(payload=payload, manifest=manifest)
@@ -95,7 +110,12 @@ class ReportAgent(NoOpAgent):
                 },
             )
 
-        report_data = self._build_report_data(payload=payload, manifest=manifest, report_locations=report_locations)
+        report_data = self._build_report_data(
+            payload=payload,
+            manifest=manifest,
+            report_locations=report_locations,
+            report_template=report_template,
+        )
 
         if draft_only:
             return AgentResult(
@@ -115,6 +135,7 @@ class ReportAgent(NoOpAgent):
                     "location_ids": report_location_ids,
                     "report_locations": report_locations,
                     "location_count": manifest.count,
+                    "report_template": report_template,
                 },
             )
 
@@ -155,6 +176,7 @@ class ReportAgent(NoOpAgent):
                 "location_ids": report_location_ids,
                 "report_locations": report_locations,
                 "location_count": manifest.count,
+                "report_template": report_template,
             },
         )
 
@@ -190,6 +212,14 @@ class ReportAgent(NoOpAgent):
         if isinstance(entries, list):
             return [entry for entry in entries if isinstance(entry, Mapping)]
         return []
+
+    def _extract_template(self, payload: Mapping[str, Any]) -> str:
+        raw_template = payload.get("report_template")
+        if isinstance(raw_template, str):
+            selected = raw_template.strip().lower()
+            if selected in _REPORT_TEMPLATES:
+                return selected
+        return "standard"
 
     def _build_report_locations(
         self,
@@ -257,6 +287,7 @@ class ReportAgent(NoOpAgent):
         payload: Mapping[str, Any],
         manifest: LocationManifest,
         report_locations: list[dict[str, Any]],
+        report_template: str,
     ) -> dict[str, Any]:
         company_research = self._extract_company_research(payload)
         company_name = str(company_research.get("company_name", "Unknown Company"))
@@ -309,6 +340,7 @@ class ReportAgent(NoOpAgent):
             "report_locations": report_locations,
             "audit_appendix": audit_appendix,
             "table_of_contents": toc,
+            "report_template": report_template,
         }
 
     def _build_toc(self, *, manifest: LocationManifest, report_locations: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -338,8 +370,12 @@ class ReportAgent(NoOpAgent):
 
         styles = getSampleStyleSheet()
         story: list[Any] = []
+        template_settings = _REPORT_TEMPLATES.get(
+            str(report_data.get("report_template", "standard")),
+            _REPORT_TEMPLATES["standard"],
+        )
 
-        story.append(Paragraph("Submission Risk Report", styles["Title"]))
+        story.append(Paragraph(str(template_settings["title"]), styles["Title"]))
         story.append(Paragraph(f"Submission ID: {report_data['submission_id']}", styles["Normal"]))
         story.append(Paragraph(f"Generated: {report_data['generated_at']}", styles["Normal"]))
         story.append(Spacer(1, 16))
@@ -387,24 +423,26 @@ class ReportAgent(NoOpAgent):
             )
             story.append(risk_badge)
 
-            category_rows = [["Category", "Score"]]
-            for category, details in section["category_scores"].items():
-                score = details.get("score") if isinstance(details, Mapping) else "N/A"
-                category_rows.append([category.replace("_", " ").title(), _format_score(score)])
-            table = Table(category_rows, hAlign="LEFT")
-            table.setStyle(
-                TableStyle(
-                    [
-                        ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
-                        ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
-                    ]
+            if bool(template_settings["include_category_table"]):
+                category_rows = [["Category", "Score"]]
+                for category, details in section["category_scores"].items():
+                    score = details.get("score") if isinstance(details, Mapping) else "N/A"
+                    category_rows.append([category.replace("_", " ").title(), _format_score(score)])
+                table = Table(category_rows, hAlign="LEFT")
+                table.setStyle(
+                    TableStyle(
+                        [
+                            ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+                            ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
+                        ]
+                    )
                 )
-            )
-            story.append(table)
+                story.append(table)
             story.append(Paragraph(f"Analysis: {section['analysis_narrative']}", styles["Normal"]))
-            story.append(Paragraph("Key Factors:", styles["Normal"]))
-            for factor in section["key_factors"]:
-                story.append(Paragraph(f"- {factor}", styles["Normal"]))
+            if bool(template_settings["include_key_factors"]):
+                story.append(Paragraph("Key Factors:", styles["Normal"]))
+                for factor in section["key_factors"]:
+                    story.append(Paragraph(f"- {factor}", styles["Normal"]))
             story.append(Paragraph(f"10-Year Climate Outlook: {section['climate_outlook_10y']}", styles["Normal"]))
             story.append(Paragraph("Sources:", styles["Normal"]))
             citations = section["citations"] or ["None available"]
@@ -449,7 +487,11 @@ class ReportAgent(NoOpAgent):
 
     def _render_markdown(self, *, report_data: Mapping[str, Any]) -> str:
         lines: list[str] = []
-        lines.append("# Submission Risk Report")
+        template_settings = _REPORT_TEMPLATES.get(
+            str(report_data.get("report_template", "standard")),
+            _REPORT_TEMPLATES["standard"],
+        )
+        lines.append(f"# {template_settings['title']}")
         lines.append("")
         lines.append(f"- Submission ID: {report_data['submission_id']}")
         lines.append(f"- Generated: {report_data['generated_at']}")
@@ -478,9 +520,10 @@ class ReportAgent(NoOpAgent):
                 f"Overall Score: {_format_score(section['overall_score'])}"
             )
             lines.append(f"- Analysis: {section['analysis_narrative']}")
-            lines.append("- Key Factors:")
-            for factor in section["key_factors"]:
-                lines.append(f"  - {factor}")
+            if bool(template_settings["include_key_factors"]):
+                lines.append("- Key Factors:")
+                for factor in section["key_factors"]:
+                    lines.append(f"  - {factor}")
             lines.append(f"- 10-Year Climate Outlook: {section['climate_outlook_10y']}")
             lines.append("- Sources:")
             for source in section["citations"] or ["None"]:
