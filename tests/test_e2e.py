@@ -114,7 +114,7 @@ def _read_report_text(report_path: Path) -> str:
 
 
 def _assert_rendered_location_sections(*, report_text: str, location_ids: list[str]) -> None:
-    headings = re.findall(r"Location\s+[^:\n]+:", report_text)
+    headings = re.findall(r"Location\s+loc-[^:\n]+:", report_text)
     assert len(headings) == len(location_ids)
     for location_id in location_ids:
         assert report_text.count(f"Location {location_id}:") == 1

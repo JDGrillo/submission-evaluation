@@ -286,10 +286,12 @@ class ReportAgent(NoOpAgent):
             }
         )
         audit_entries = self._extract_audit_entries(payload)
+        raw_input_files = payload.get("input_files")
+        input_files = raw_input_files if isinstance(raw_input_files, (list, tuple)) else []
         audit_appendix = {
             "input_files": [
                 str(item)
-                for item in payload.get("input_files", [])
+                for item in input_files
                 if isinstance(item, str)
             ],
             "location_count_expected": manifest.count,

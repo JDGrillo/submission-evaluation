@@ -125,6 +125,11 @@ class OrchestratorAgent:
                 stage_input: Dict[str, Any] = dict(latest_payload)
                 if manifest is not None:
                     stage_input["manifest"] = manifest.to_dict()
+                    stage_input["location_ids"] = [
+                        str(location.id)
+                        for location in manifest.locations
+                        if location.id
+                    ]
                 if stage_name == "report":
                     stage_input["draft_only"] = True
 
@@ -620,7 +625,14 @@ class OrchestratorAgent:
         if stage_name == "research":
             research_results = payload.get("research_results")
             if isinstance(research_results, Mapping):
-                return [str(item) for item in research_results.keys()]
+                if research_results:
+                    return [str(item) for item in research_results.keys()]
+                received_payload = payload.get("received")
+                if isinstance(received_payload, Mapping):
+                    received_ids = received_payload.get("location_ids")
+                    if isinstance(received_ids, list):
+                        return [str(item) for item in received_ids]
+                return []
 
         if stage_name == "analysis":
             risk_scores = payload.get("risk_scores_by_location")

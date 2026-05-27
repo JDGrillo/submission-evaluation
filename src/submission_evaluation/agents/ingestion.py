@@ -341,10 +341,10 @@ def _extract_pdf_text_from_file(file_path: Path) -> str:
     return "\n".join(chunks)
 
 
-def _normalize_address_part(value: str | None) -> str:
+def _normalize_address_part(value: object | None) -> str:
     if value is None:
         return ""
-    return re.sub(r"[^a-z0-9]", "", value.lower())
+    return re.sub(r"[^a-z0-9]", "", str(value).lower())
 
 
 def _address_key(
