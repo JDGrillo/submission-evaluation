@@ -1,0 +1,4 @@
+[console_scripts]
+submission-eval = submission_evaluation.main:main
+submission-eval-deploy = submission_evaluation.deploy:main
+submission-eval-smoke = submission_evaluation.deploy_smoke:main

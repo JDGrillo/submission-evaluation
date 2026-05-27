@@ -1,0 +1,110 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .[dev]
+
+      - name: Run tests
+        id: pytest
+        shell: bash
+        run: |
+          set +e
+          python -m pytest --junitxml=pytest-report.xml
+          exit_code=$?
+          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Build test report
+        if: always()
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          report_path = Path("pytest-report.xml")
+          summary_path = Path(os.environ["GITHUB_STEP_SUMMARY"])
+          if not report_path.exists():
+              summary_path.write_text("## Test report\n\nPytest did not produce a JUnit XML report.\n", encoding="utf-8")
+              raise SystemExit(0)
+
+          root = ET.parse(report_path).getroot()
+          suite = root if root.tag == "testsuite" else root.find("testsuite")
+          if suite is None:
+              summary_path.write_text("## Test report\n\nUnable to parse JUnit XML output.\n", encoding="utf-8")
+              raise SystemExit(0)
+
+          tests = int(suite.attrib.get("tests", 0))
+          failures = int(suite.attrib.get("failures", 0))
+          errors = int(suite.attrib.get("errors", 0))
+          skipped = int(suite.attrib.get("skipped", 0))
+          passed = tests - failures - errors - skipped
+
+          lines = [
+              "## Test report",
+              "",
+              "| Metric | Count |",
+              "| --- | ---: |",
+              f"| Passed | {passed} |",
+              f"| Failed | {failures} |",
+              f"| Errors | {errors} |",
+              f"| Skipped | {skipped} |",
+              f"| Total | {tests} |",
+          ]
+
+          failing_cases = []
+          for case in suite.iter("testcase"):
+              failure = case.find("failure")
+              error = case.find("error")
+              if failure is None and error is None:
+                  continue
+              name = f"{case.attrib.get('classname', 'unknown')}.{case.attrib.get('name', 'unknown')}"
+              message = (failure or error).attrib.get("message", "").strip()
+              failing_cases.append((name, message))
+
+          if failing_cases:
+              lines.extend(["", "### Failing tests", ""])
+              for name, message in failing_cases[:20]:
+                  details = f": {message}" if message else ""
+                  lines.append(f"- `{name}`{details}")
+              if len(failing_cases) > 20:
+                  lines.append(f"- ...and {len(failing_cases) - 20} more")
+
+          summary_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+          PY
+
+      - name: Upload test report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-report
+          path: pytest-report.xml
+          if-no-files-found: error
+
+      - name: Fail job on test failures
+        if: steps.pytest.outputs.exit_code != '0'
+        run: exit 1
